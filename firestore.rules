@@ -1,0 +1,522 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Startup connectivity check endpoint (no sensitive data)
+    match /test/connection {
+      allow get: if true;
+    }
+
+    // --- Primitive Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        request.auth.token.email == 'anikesh.0251mba193@dgu.ac.in' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // --- Validation Blueprints ---
+    function isValidPlatformSettings(data) {
+      return data.keys().hasAll([
+        'freeAiCreditsPerDay',
+        'premiumAiCreditsPerDay',
+        'freeWatchlistLimit',
+        'premiumWatchlistLimit',
+        'freeComparisonLimit',
+        'premiumComparisonLimit',
+        'freeHistoryRetentionDays',
+        'premiumHistoryRetentionDays',
+        'premiumPriceInr',
+        'subscriptionDurationDays',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'freeAiCreditsPerDay',
+        'premiumAiCreditsPerDay',
+        'freeWatchlistLimit',
+        'premiumWatchlistLimit',
+        'freeComparisonLimit',
+        'premiumComparisonLimit',
+        'freeHistoryRetentionDays',
+        'premiumHistoryRetentionDays',
+        'premiumPriceInr',
+        'subscriptionDurationDays',
+        'updatedAt'
+      ]) &&
+      data.freeAiCreditsPerDay is number && data.freeAiCreditsPerDay >= 0 && data.freeAiCreditsPerDay <= 1000 &&
+      data.premiumAiCreditsPerDay is number && data.premiumAiCreditsPerDay >= 0 && data.premiumAiCreditsPerDay <= 10000 &&
+      data.freeWatchlistLimit is number && data.freeWatchlistLimit >= 1 && data.freeWatchlistLimit <= 100 &&
+      data.premiumWatchlistLimit is number && data.premiumWatchlistLimit >= 1 && data.premiumWatchlistLimit <= 500 &&
+      data.freeComparisonLimit is number && data.freeComparisonLimit >= 1 && data.freeComparisonLimit <= 20 &&
+      data.premiumComparisonLimit is number && data.premiumComparisonLimit >= 1 && data.premiumComparisonLimit <= 50 &&
+      data.freeHistoryRetentionDays is number && data.freeHistoryRetentionDays >= 1 && data.freeHistoryRetentionDays <= 3650 &&
+      data.premiumHistoryRetentionDays is number && data.premiumHistoryRetentionDays >= 1 && data.premiumHistoryRetentionDays <= 3650 &&
+      data.premiumPriceInr is number && data.premiumPriceInr >= 0 && data.premiumPriceInr <= 100000 &&
+      data.subscriptionDurationDays is number && data.subscriptionDurationDays >= 1 && data.subscriptionDurationDays <= 3650 &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidUserAccount(data, expectedUid) {
+      return data.keys().hasAll(['uid', 'displayName', 'tier', 'role', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'photoURL',
+          'tier',
+          'role',
+          'aiCreditsUsedToday',
+          'aiCreditsDate',
+          'termsAcceptedAt',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.uid == expectedUid &&
+        isValidId(data.uid) &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+        (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 512)) &&
+        data.tier in ['free', 'premium'] &&
+        data.role in ['investor', 'admin'] &&
+        (!('aiCreditsUsedToday' in data) || (data.aiCreditsUsedToday is number && data.aiCreditsUsedToday >= 0 && data.aiCreditsUsedToday <= 10000)) &&
+        (!('aiCreditsDate' in data) || (data.aiCreditsDate is string && data.aiCreditsDate.size() <= 16)) &&
+        (!('termsAcceptedAt' in data) || (data.termsAcceptedAt is string && data.termsAcceptedAt.size() <= 64)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidPrivateProfile(data, expectedUid) {
+      return data.keys().hasAll(['uid', 'email', 'riskDisclosureAccepted', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'uid',
+          'email',
+          'phone',
+          'preferredCurrency',
+          'timezone',
+          'riskDisclosureAccepted',
+          'notifyCorporateActions',
+          'notifyResearchDigest',
+          'updatedAt'
+        ]) &&
+        data.uid == expectedUid &&
+        isValidId(data.uid) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 200 &&
+        (!('phone' in data) || (data.phone is string && data.phone.size() <= 32)) &&
+        (!('preferredCurrency' in data) || data.preferredCurrency == 'INR') &&
+        (!('timezone' in data) || (data.timezone is string && data.timezone.size() >= 1 && data.timezone.size() <= 64)) &&
+        data.riskDisclosureAccepted is bool &&
+        (!('notifyCorporateActions' in data) || data.notifyCorporateActions is bool) &&
+        (!('notifyResearchDigest' in data) || data.notifyResearchDigest is bool) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidPortfolio(data, expectedUid) {
+      return data.keys().hasAll(['userId', 'name', 'currency', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['userId', 'name', 'currency', 'notes', 'createdAt', 'updatedAt']) &&
+        data.userId == expectedUid &&
+        isValidId(data.userId) &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+        data.currency == 'INR' &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 500)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidTransaction(data, expectedUid) {
+      return data.keys().hasAll([
+        'userId',
+        'portfolioId',
+        'symbol',
+        'exchange',
+        'type',
+        'quantity',
+        'priceInr',
+        'tradeDate',
+        'createdAt'
+      ]) &&
+      data.keys().hasOnly([
+        'userId',
+        'portfolioId',
+        'symbol',
+        'exchange',
+        'type',
+        'quantity',
+        'priceInr',
+        'feesInr',
+        'tradeDate',
+        'notes',
+        'createdAt'
+      ]) &&
+      data.userId == expectedUid &&
+      isValidId(data.userId) &&
+      isValidId(data.portfolioId) &&
+      data.symbol is string && data.symbol.size() >= 1 && data.symbol.size() <= 24 && data.symbol.matches('^[A-Z0-9_\\-]+$') &&
+      data.exchange in ['NSE', 'BSE'] &&
+      data.type in ['BUY', 'SELL'] &&
+      data.quantity is number && data.quantity > 0 && data.quantity <= 100000000 &&
+      data.priceInr is number && data.priceInr > 0 && data.priceInr <= 100000000 &&
+      (!('feesInr' in data) || (data.feesInr is number && data.feesInr >= 0 && data.feesInr <= 10000000)) &&
+      data.tradeDate is string && data.tradeDate.size() == 10 &&
+      (!('notes' in data) || (data.notes is string && data.notes.size() <= 240)) &&
+      data.createdAt is timestamp;
+    }
+
+    function isValidWatchlist(data, expectedUid) {
+      return data.keys().hasAll(['userId', 'name', 'symbols', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['userId', 'name', 'symbols', 'createdAt', 'updatedAt']) &&
+        data.userId == expectedUid &&
+        isValidId(data.userId) &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 64 &&
+        data.symbols is list && data.symbols.size() <= 50 &&
+        (data.symbols.size() == 0 || (data.symbols[0] is string && data.symbols[0].size() >= 1 && data.symbols[0].size() <= 24)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidResearchReport(data, expectedUid) {
+      return data.keys().hasAll([
+        'userId',
+        'symbol',
+        'companyName',
+        'snapshotId',
+        'aiProvider',
+        'modelId',
+        'promptVersion',
+        'generatedAt',
+        'executiveThesis',
+        'valuationAssessment',
+        'profitabilitySummary',
+        'balanceSheetSummary',
+        'limitations',
+        'createdAt'
+      ]) &&
+      data.keys().hasOnly([
+        'userId',
+        'symbol',
+        'companyName',
+        'snapshotId',
+        'aiProvider',
+        'modelId',
+        'promptVersion',
+        'generatedAt',
+        'executiveThesis',
+        'valuationAssessment',
+        'profitabilitySummary',
+        'balanceSheetSummary',
+        'limitations',
+        'createdAt'
+      ]) &&
+      data.userId == expectedUid &&
+      isValidId(data.userId) &&
+      data.symbol is string && data.symbol.size() >= 1 && data.symbol.size() <= 24 && data.symbol.matches('^[A-Z0-9_\\-]+$') &&
+      data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 160 &&
+      data.snapshotId is string && data.snapshotId.size() >= 1 && data.snapshotId.size() <= 128 &&
+      data.aiProvider is string && data.aiProvider.size() >= 1 && data.aiProvider.size() <= 64 &&
+      data.modelId is string && data.modelId.size() >= 1 && data.modelId.size() <= 64 &&
+      data.promptVersion is string && data.promptVersion.size() >= 1 && data.promptVersion.size() <= 32 &&
+      data.generatedAt is string && data.generatedAt.size() >= 1 && data.generatedAt.size() <= 64 &&
+      data.executiveThesis is string && data.executiveThesis.size() >= 1 && data.executiveThesis.size() <= 3000 &&
+      data.valuationAssessment is string && data.valuationAssessment.size() >= 1 && data.valuationAssessment.size() <= 3000 &&
+      data.profitabilitySummary is string && data.profitabilitySummary.size() >= 1 && data.profitabilitySummary.size() <= 3000 &&
+      data.balanceSheetSummary is string && data.balanceSheetSummary.size() >= 1 && data.balanceSheetSummary.size() <= 3000 &&
+      data.limitations is string && data.limitations.size() >= 1 && data.limitations.size() <= 2000 &&
+      data.createdAt is timestamp;
+    }
+
+    function isValidSubscription(data, expectedUid) {
+      return data.keys().hasAll([
+        'userId',
+        'planId',
+        'status',
+        'amountInr',
+        'currency',
+        'paymentProvider',
+        'webhookVerified',
+        'referenceCode',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'userId',
+        'planId',
+        'status',
+        'amountInr',
+        'currency',
+        'paymentProvider',
+        'webhookVerified',
+        'referenceCode',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.userId == expectedUid &&
+      isValidId(data.userId) &&
+      data.planId in ['free', 'premium_monthly'] &&
+      data.status in ['pending_verification', 'active', 'cancelled', 'refunded'] &&
+      data.amountInr is number && data.amountInr >= 0 && data.amountInr <= 100000 &&
+      data.currency == 'INR' &&
+      data.paymentProvider is string && data.paymentProvider.size() >= 1 && data.paymentProvider.size() <= 48 &&
+      data.webhookVerified is bool &&
+      data.referenceCode is string && data.referenceCode.size() >= 1 && data.referenceCode.size() <= 128 &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidSupportTicket(data) {
+      return data.keys().hasAll([
+        'userId',
+        'subject',
+        'category',
+        'message',
+        'status',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'userId',
+        'subject',
+        'category',
+        'message',
+        'status',
+        'adminReply',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      isValidId(data.userId) &&
+      data.subject is string && data.subject.size() >= 3 && data.subject.size() <= 160 &&
+      data.category in ['data_accuracy', 'billing', 'account', 'compliance', 'feature'] &&
+      data.message is string && data.message.size() >= 10 && data.message.size() <= 2000 &&
+      data.status in ['open', 'in_review', 'resolved'] &&
+      (!('adminReply' in data) || (data.adminReply is string && data.adminReply.size() <= 2000)) &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['userId', 'action', 'target', 'createdAt']) &&
+        data.keys().hasOnly(['userId', 'action', 'target', 'details', 'createdAt']) &&
+        isValidId(data.userId) &&
+        data.action is string && data.action.size() >= 2 && data.action.size() <= 80 &&
+        data.target is string && data.target.size() >= 1 && data.target.size() <= 120 &&
+        (!('details' in data) || (data.details is string && data.details.size() <= 500)) &&
+        data.createdAt is timestamp;
+    }
+
+    // --- Collection Match Blocks ---
+    match /platformConfig/{configId} {
+      allow get: if isValidId(configId);
+      allow create, update: if isAdmin() && isValidId(configId) && isValidPlatformSettings(incoming()) && incoming().updatedAt == request.time;
+    }
+
+    match /admins/{adminUid} {
+      allow get: if isAdmin() && isValidId(adminUid);
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isVerifiedOwner(userId) &&
+        isValidId(userId) &&
+        isValidUserAccount(incoming(), userId) &&
+        incoming().role == 'investor' &&
+        incoming().tier == 'free' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(userId) &&
+        isValidUserAccount(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            isVerifiedOwner(userId) &&
+            incoming().role == existing().role &&
+            incoming().tier == existing().tier && (
+              incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'termsAcceptedAt', 'updatedAt']) ||
+              incoming().diff(existing()).affectedKeys().hasOnly(['aiCreditsUsedToday', 'aiCreditsDate', 'updatedAt'])
+            )
+          )
+        );
+
+      match /private/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
+        allow create: if isVerifiedOwner(userId) &&
+          isValidId(userId) &&
+          docId == 'profile' &&
+          isValidPrivateProfile(incoming(), userId) &&
+          incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) &&
+          docId == 'profile' &&
+          isValidPrivateProfile(incoming(), userId) &&
+          incoming().uid == existing().uid &&
+          incoming().updatedAt == request.time && (
+            isAdmin() ||
+            (
+              isVerifiedOwner(userId) &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'email',
+                'phone',
+                'preferredCurrency',
+                'timezone',
+                'riskDisclosureAccepted',
+                'notifyCorporateActions',
+                'notifyResearchDigest',
+                'updatedAt'
+              ])
+            )
+          );
+      }
+
+      match /portfolios/{portfolioId} {
+        allow get: if isValidId(userId) && isValidId(portfolioId) && (isOwner(userId) || isAdmin());
+        allow list: if isSignedIn() && (request.auth.uid == userId || isAdmin()) && resource.data.userId == userId;
+        allow create: if isVerifiedOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(portfolioId) &&
+          isValidPortfolio(incoming(), userId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) &&
+          isValidId(portfolioId) &&
+          isValidPortfolio(incoming(), userId) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time && (
+            isAdmin() ||
+            (isVerifiedOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'notes', 'updatedAt']))
+          );
+        allow delete: if isValidId(userId) && isValidId(portfolioId) && (isVerifiedOwner(userId) || isAdmin());
+      }
+
+      match /transactions/{txId} {
+        allow get: if isValidId(userId) && isValidId(txId) && (isOwner(userId) || isAdmin());
+        allow list: if isSignedIn() && (request.auth.uid == userId || isAdmin()) && resource.data.userId == userId;
+        allow create: if isVerifiedOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(txId) &&
+          isValidTransaction(incoming(), userId) &&
+          incoming().createdAt == request.time &&
+          exists(/databases/$(database)/documents/users/$(userId)/portfolios/$(incoming().portfolioId));
+        allow delete: if isValidId(userId) && isValidId(txId) && (isVerifiedOwner(userId) || isAdmin());
+      }
+
+      match /watchlists/{watchlistId} {
+        allow get: if isValidId(userId) && isValidId(watchlistId) && (isOwner(userId) || isAdmin());
+        allow list: if isSignedIn() && (request.auth.uid == userId || isAdmin()) && resource.data.userId == userId;
+        allow create: if isVerifiedOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(watchlistId) &&
+          isValidWatchlist(incoming(), userId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) &&
+          isValidId(watchlistId) &&
+          isValidWatchlist(incoming(), userId) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time && (
+            isAdmin() ||
+            (isVerifiedOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'symbols', 'updatedAt']))
+          );
+        allow delete: if isValidId(userId) && isValidId(watchlistId) && (isVerifiedOwner(userId) || isAdmin());
+      }
+
+      match /researchReports/{reportId} {
+        allow get: if isValidId(userId) && isValidId(reportId) && (isOwner(userId) || isAdmin());
+        allow list: if isSignedIn() && (request.auth.uid == userId || isAdmin()) && resource.data.userId == userId;
+        allow create: if isVerifiedOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(reportId) &&
+          isValidResearchReport(incoming(), userId) &&
+          incoming().createdAt == request.time;
+        allow delete: if isValidId(userId) && isValidId(reportId) && (isVerifiedOwner(userId) || isAdmin());
+      }
+
+      match /subscriptions/{subId} {
+        allow get: if isValidId(userId) && isValidId(subId) && (isOwner(userId) || isAdmin());
+        allow list: if isSignedIn() && (request.auth.uid == userId || isAdmin()) && resource.data.userId == userId;
+        allow create: if isValidId(userId) &&
+          isValidId(subId) &&
+          isValidSubscription(incoming(), userId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time && (
+            isAdmin() ||
+            (isVerifiedOwner(userId) && incoming().status == 'pending_verification' && incoming().webhookVerified == false)
+          );
+        allow update: if isAdmin() &&
+          isValidId(userId) &&
+          isValidId(subId) &&
+          isValidSubscription(incoming(), userId) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time;
+      }
+    }
+
+    match /supportTickets/{ticketId} {
+      allow get: if isValidId(ticketId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isVerifiedUser() &&
+        isValidId(ticketId) &&
+        isValidSupportTicket(incoming()) &&
+        incoming().userId == request.auth.uid &&
+        incoming().status == 'open' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(ticketId) &&
+        isValidSupportTicket(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            isVerifiedUser() &&
+            existing().userId == request.auth.uid &&
+            existing().status != 'resolved' &&
+            incoming().status == existing().status &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['message', 'updatedAt'])
+          )
+        );
+    }
+
+    match /auditLogs/{logId} {
+      allow get: if isValidId(logId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isVerifiedUser() &&
+        isValidId(logId) &&
+        isValidAuditLog(incoming()) &&
+        incoming().userId == request.auth.uid &&
+        incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+  }
+}

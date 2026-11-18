@@ -1,0 +1,8 @@
+{
+  "name": "InvestWise AI",
+  "description": "Indian FinTech investment research and portfolio intelligence platform with deterministic financial calculations, data provenance, and grounded AI analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

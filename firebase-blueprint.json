@@ -1,0 +1,242 @@
+{
+  "entities": {
+    "PlatformSettings": {
+      "title": "PlatformSettings",
+      "description": "Configurable subscription limits, AI quotas, and data provider licensing flags.",
+      "type": "object",
+      "properties": {
+        "freeAiCreditsPerDay": { "type": "number" },
+        "premiumAiCreditsPerDay": { "type": "number" },
+        "freeWatchlistLimit": { "type": "number" },
+        "premiumWatchlistLimit": { "type": "number" },
+        "freeComparisonLimit": { "type": "number" },
+        "premiumComparisonLimit": { "type": "number" },
+        "freeHistoryRetentionDays": { "type": "number" },
+        "premiumHistoryRetentionDays": { "type": "number" },
+        "premiumPriceInr": { "type": "number" },
+        "subscriptionDurationDays": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "freeAiCreditsPerDay",
+        "premiumAiCreditsPerDay",
+        "freeWatchlistLimit",
+        "premiumWatchlistLimit",
+        "freeComparisonLimit",
+        "premiumComparisonLimit",
+        "freeHistoryRetentionDays",
+        "premiumHistoryRetentionDays",
+        "premiumPriceInr",
+        "subscriptionDurationDays",
+        "updatedAt"
+      ]
+    },
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Publicly minimal investor account metadata without PII.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "photoURL": { "type": "string", "maxLength": 512 },
+        "tier": { "type": "string", "enum": ["free", "premium"] },
+        "role": { "type": "string", "enum": ["investor", "admin"] },
+        "aiCreditsUsedToday": { "type": "number" },
+        "aiCreditsDate": { "type": "string", "maxLength": 16 },
+        "termsAcceptedAt": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "tier", "role", "createdAt", "updatedAt"]
+    },
+    "UserPrivateProfile": {
+      "title": "UserPrivateProfile",
+      "description": "Isolated PII, locale, currency, and notification preferences for an investor.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "minLength": 3, "maxLength": 200 },
+        "phone": { "type": "string", "maxLength": 32 },
+        "preferredCurrency": { "type": "string", "enum": ["INR"] },
+        "timezone": { "type": "string", "maxLength": 64 },
+        "riskDisclosureAccepted": { "type": "boolean" },
+        "notifyCorporateActions": { "type": "boolean" },
+        "notifyResearchDigest": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "riskDisclosureAccepted", "updatedAt"]
+    },
+    "Portfolio": {
+      "title": "Portfolio",
+      "description": "Named equity portfolio owned by an investor.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "currency": { "type": "string", "enum": ["INR"] },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "currency", "createdAt", "updatedAt"]
+    },
+    "PortfolioTransaction": {
+      "title": "PortfolioTransaction",
+      "description": "Manual or CSV-imported equity trade transaction.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "portfolioId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 24, "pattern": "^[A-Z0-9_\\-]+$" },
+        "exchange": { "type": "string", "enum": ["NSE", "BSE"] },
+        "type": { "type": "string", "enum": ["BUY", "SELL"] },
+        "quantity": { "type": "number" },
+        "priceInr": { "type": "number" },
+        "feesInr": { "type": "number" },
+        "tradeDate": { "type": "string", "minLength": 10, "maxLength": 10 },
+        "notes": { "type": "string", "maxLength": 240 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "portfolioId", "symbol", "exchange", "type", "quantity", "priceInr", "tradeDate", "createdAt"]
+    },
+    "Watchlist": {
+      "title": "Watchlist",
+      "description": "Investor watchlist containing bounded NSE/BSE stock symbols.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "symbols": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "symbols", "createdAt", "updatedAt"]
+    },
+    "ResearchReport": {
+      "title": "ResearchReport",
+      "description": "Saved grounded AI research snapshot linked to deterministic calculations.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 24, "pattern": "^[A-Z0-9_\\-]+$" },
+        "companyName": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "snapshotId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "aiProvider": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "modelId": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "promptVersion": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "generatedAt": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "executiveThesis": { "type": "string", "minLength": 1, "maxLength": 3000 },
+        "valuationAssessment": { "type": "string", "minLength": 1, "maxLength": 3000 },
+        "profitabilitySummary": { "type": "string", "minLength": 1, "maxLength": 3000 },
+        "balanceSheetSummary": { "type": "string", "minLength": 1, "maxLength": 3000 },
+        "limitations": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId",
+        "symbol",
+        "companyName",
+        "snapshotId",
+        "aiProvider",
+        "modelId",
+        "promptVersion",
+        "generatedAt",
+        "executiveThesis",
+        "valuationAssessment",
+        "profitabilitySummary",
+        "balanceSheetSummary",
+        "limitations",
+        "createdAt"
+      ]
+    },
+    "SubscriptionRecord": {
+      "title": "SubscriptionRecord",
+      "description": "Subscription request, payment audit trail, and webhook verification state.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "planId": { "type": "string", "enum": ["free", "premium_monthly"] },
+        "status": { "type": "string", "enum": ["pending_verification", "active", "cancelled", "refunded"] },
+        "amountInr": { "type": "number" },
+        "currency": { "type": "string", "enum": ["INR"] },
+        "paymentProvider": { "type": "string", "minLength": 1, "maxLength": 48 },
+        "webhookVerified": { "type": "boolean" },
+        "referenceCode": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "planId", "status", "amountInr", "currency", "paymentProvider", "webhookVerified", "referenceCode", "createdAt", "updatedAt"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "User support and compliance inquiry ticket.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "subject": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "category": { "type": "string", "enum": ["data_accuracy", "billing", "account", "compliance", "feature"] },
+        "message": { "type": "string", "minLength": 10, "maxLength": 2000 },
+        "status": { "type": "string", "enum": ["open", "in_review", "resolved"] },
+        "adminReply": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "subject", "category", "message", "status", "createdAt", "updatedAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable append-only security and compliance audit trail entry.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "action": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "target": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "details": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "action", "target", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/platformConfig/settings": {
+      "schema": { "$ref": "#/entities/PlatformSettings" },
+      "description": "Global platform configuration and configurable tier quotas."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserAccount" },
+      "description": "Investor account tier, role, and daily AI usage counter."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateProfile" },
+      "description": "Strictly isolated PII, locale, currency, and notification preferences."
+    },
+    "/users/{userId}/portfolios/{portfolioId}": {
+      "schema": { "$ref": "#/entities/Portfolio" },
+      "description": "User-owned equity portfolios."
+    },
+    "/users/{userId}/transactions/{txId}": {
+      "schema": { "$ref": "#/entities/PortfolioTransaction" },
+      "description": "Buy/Sell equity transactions linked to a verified user portfolio."
+    },
+    "/users/{userId}/watchlists/{watchlistId}": {
+      "schema": { "$ref": "#/entities/Watchlist" },
+      "description": "User watchlists with bounded stock symbol lists."
+    },
+    "/users/{userId}/researchReports/{reportId}": {
+      "schema": { "$ref": "#/entities/ResearchReport" },
+      "description": "Saved grounded AI research reports with provenance metadata."
+    },
+    "/users/{userId}/subscriptions/{subId}": {
+      "schema": { "$ref": "#/entities/SubscriptionRecord" },
+      "description": "Subscription history and payment audit log."
+    },
+    "/supportTickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/SupportTicket" },
+      "description": "Investor support requests isolated per user and triaged by admins."
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Append-only security and compliance audit trail."
+    }
+  }
+}
